@@ -39,6 +39,8 @@ class GazeModelConfig:
     focal_length_norm: float = 960.0   # focal length of normalized virtual camera (ETH-XGaze default)
     mean: tuple = (0.485, 0.456, 0.406)
     std: tuple = (0.229, 0.224, 0.225)
+    pitch_offset: float = 0.0   # radians — added to pitch_cam to correct systematic vertical bias
+    yaw_offset: float = 0.04    # radians — added to yaw_cam to correct systematic horizontal bias
 
 
 @dataclass
@@ -47,25 +49,35 @@ class CalibrationConfig:
     grid_rows: int = 3
     grid_cols: int = 3
     samples_per_point: int = 30
-    settle_frames: int = 15
+    settle_frames: int = 30
     dot_display_ms: int = 2000
     margin_fraction: float = 0.08
 
-    mlp_input_dim: int = 5
-    mlp_hidden_dim: int = 64
-    mlp_output_dim: int = 2
-    mlp_epochs: int = 500
-    mlp_lr: float = 0.01
-    mlp_weight_decay: float = 1e-4
+    poly_degree: int = 2       # polynomial degree for gaze→screen regression
+    ridge_alpha: float = 1e-3  # ridge regularisation strength
 
     save_dir: Path = Path("calibration_data")
 
 
 @dataclass
+class GazeSmoothingConfig:
+    """One-Euro filter for raw gaze angles (radians) BEFORE ray-plane intersection.
+
+    Filtering here prevents small angular jitter from being geometrically
+    amplified into large pixel wobble on screen.  Values are more aggressive
+    than the screen-space filter because gaze angles change slowly during
+    fixation but need to track saccades quickly.
+    """
+    min_cutoff: float = 0.4   # Hz — low = heavy smoothing during fixation
+    beta: float = 0.7         # speed coefficient — ramps cutoff during saccades
+    d_cutoff: float = 1.0     # derivative filter cutoff
+
+
+@dataclass
 class SmoothingConfig:
-    """One-Euro filter parameters."""
-    min_cutoff: float = 1.5
-    beta: float = 0.5
+    """One-Euro filter for final screen-space pixel coordinates."""
+    min_cutoff: float = 1.2
+    beta: float = 0.4
     d_cutoff: float = 1.0
 
 
@@ -108,6 +120,7 @@ class EyeconConfig:
     camera: CameraConfig = field(default_factory=CameraConfig)
     gaze: GazeModelConfig = field(default_factory=GazeModelConfig)
     calibration: CalibrationConfig = field(default_factory=CalibrationConfig)
+    gaze_smoothing: GazeSmoothingConfig = field(default_factory=GazeSmoothingConfig)
     smoothing: SmoothingConfig = field(default_factory=SmoothingConfig)
     wink: WinkConfig = field(default_factory=WinkConfig)
     screen: ScreenConfig = field(default_factory=ScreenConfig)

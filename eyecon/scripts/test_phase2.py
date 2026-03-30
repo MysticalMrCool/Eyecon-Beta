@@ -23,7 +23,7 @@ from landmarks import FaceLandmarkDetector, _MODEL_POINTS_3D, _PNP_LANDMARK_IDX
 from normalization import GazeNormalizer
 from utils import pitchyaw_to_vector
 
-# Optional — only needed when the ONNX model exists.
+# Optional — only needed when the gaze model (.pth) exists.
 _gaze_available = False
 try:
     from gaze_model import GazeEstimator, unnormalize_gaze
