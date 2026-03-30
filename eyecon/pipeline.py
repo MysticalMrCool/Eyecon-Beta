@@ -147,7 +147,37 @@ class EyeconPipeline:
             return False
 
         loss = self._calibration.train(data)
-        print(f"Calibration complete (final MSE loss: {loss:.6f})")
+
+        # --- Per-point diagnostics ---
+        unique_targets = []
+        seen = set()
+        for t in data.targets:
+            key = (float(t[0]), float(t[1]))
+            if key not in seen:
+                seen.add(key)
+                unique_targets.append(t)
+
+        print(f"\nCalibration trained — overall MSE: {loss:.1f} px²")
+        print(f"  {'Target':>20s}    {'Predicted':>20s}    {'Error'}")
+        print(f"  {'------':>20s}    {'---------':>20s}    {'-----'}")
+        errors = []
+        point_data = []  # for visual validation
+        for tgt in unique_targets:
+            mask = np.all(np.abs(data.targets - tgt) < 0.5, axis=1)
+            mean_feat = data.features[mask].mean(axis=0)
+            pred = self._calibration.predict(mean_feat)
+            err = np.sqrt(np.sum((pred - tgt) ** 2))
+            n_samples = int(mask.sum())
+            errors.append(err)
+            point_data.append((tgt, pred, mean_feat, n_samples))
+            print(f"  ({tgt[0]:7.0f}, {tgt[1]:5.0f})    "
+                  f"({pred[0]:7.0f}, {pred[1]:5.0f})    "
+                  f"{err:5.1f}px  ({n_samples} samples)")
+        print(f"  Mean error: {np.mean(errors):.1f}px, "
+              f"Max: {np.max(errors):.1f}px\n")
+
+        # --- Visual validation screen ---
+        self._show_calibration_validation(point_data)
 
         profile = get_profile_path(
             self._cfg.calibration,
@@ -160,6 +190,45 @@ class EyeconPipeline:
         self._smoother.reset()
         self._gaze_smoother.reset()
         return True
+
+    def _show_calibration_validation(
+        self,
+        point_data: list[tuple],
+    ) -> None:
+        """Show a fullscreen overlay comparing target vs predicted positions."""
+        w, h = self._cfg.screen.width, self._cfg.screen.height
+        canvas = np.zeros((h, w, 3), dtype=np.uint8)
+
+        for tgt, pred, _, n_samples in point_data:
+            tx, ty = int(tgt[0]), int(tgt[1])
+            px, py = int(np.clip(pred[0], 0, w)), int(np.clip(pred[1], 0, h))
+            err = np.sqrt((pred[0] - tgt[0]) ** 2 + (pred[1] - tgt[1]) ** 2)
+
+            # Grey line connecting target to prediction.
+            cv2.line(canvas, (tx, ty), (px, py), (80, 80, 80), 1)
+            # Green hollow circle = target (where the dot was).
+            cv2.circle(canvas, (tx, ty), 18, (0, 255, 0), 2)
+            # Red filled circle = polynomial prediction.
+            cv2.circle(canvas, (px, py), 8, (0, 0, 255), -1)
+            # Error label.
+            cv2.putText(canvas, f"{err:.0f}px",
+                        (tx + 25, ty + 5), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, (200, 200, 200), 1)
+
+        cv2.putText(canvas,
+                    "Green = target dot position, Red = predicted cursor position",
+                    (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 1)
+        cv2.putText(canvas,
+                    "Press any key to continue...",
+                    (30, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 1)
+
+        val_win = "Calibration Validation"
+        cv2.namedWindow(val_win, cv2.WINDOW_NORMAL)
+        cv2.setWindowProperty(val_win, cv2.WND_PROP_FULLSCREEN,
+                              cv2.WINDOW_FULLSCREEN)
+        cv2.imshow(val_win, canvas)
+        cv2.waitKey(0)
+        cv2.destroyWindow(val_win)
 
     # ---- main loop ------------------------------------------------------
 

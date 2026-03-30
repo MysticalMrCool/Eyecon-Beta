@@ -291,10 +291,20 @@ class CalibrationUI:
                 if cancelled:
                     break
 
-                # Store all individual samples (not averaged) for better
-                # statistical conditioning of the polynomial regression.
+                # Reject outlier samples (saccades, detection glitches)
+                # using median-distance thresholding.
+                stacked = np.array(collected, dtype=np.float32)
+                med = np.median(stacked, axis=0)
+                dists = np.linalg.norm(stacked - med, axis=1)
+                cutoff = np.median(dists) * 3.0
+                if cutoff > 1e-6:
+                    mask = dists <= cutoff
+                    if mask.sum() >= 5:
+                        stacked = stacked[mask]
+
+                # Store all kept samples for polynomial regression.
                 target = np.array([tx, ty], dtype=np.float32)
-                for feat in collected:
+                for feat in stacked:
                     all_features.append(feat)
                     all_targets.append(target)
 

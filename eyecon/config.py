@@ -39,8 +39,8 @@ class GazeModelConfig:
     focal_length_norm: float = 960.0   # focal length of normalized virtual camera (ETH-XGaze default)
     mean: tuple = (0.485, 0.456, 0.406)
     std: tuple = (0.229, 0.224, 0.225)
-    pitch_offset: float = 0.0   # radians — added to pitch_cam to correct systematic vertical bias
-    yaw_offset: float = 0.04    # radians — added to yaw_cam to correct systematic horizontal bias
+    pitch_offset: float = 0.0   # radians — added to pitch_cam (only affects gaze arrow + fallback)
+    yaw_offset: float = 0.0     # radians — added to yaw_cam (polynomial absorbs any bias during calibration)
 
 
 @dataclass
