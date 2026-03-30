@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+
+# Model weights (downloaded via scripts/download_model.py)
+eyecon/models/*.pth
+eyecon/models/*.onnx
+eyecon/models/*.onnx.data
+eyecon/models/*.task
+
+# Calibration data (user-specific)
+eyecon/calibration_data/*.npz
+eyecon/calibration_data/*.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
